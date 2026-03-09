@@ -1,0 +1,150 @@
+#####################################################
+# Dependency-Track with Keycloak OIDC Integration
+#
+# This configuration includes:
+#   - Dependency-Track API Server (with OIDC)
+#   - Dependency-Track FrontEnd (with OIDC)
+#   - PostgreSQL Database
+#   - Keycloak (OIDC Provider)
+#   - (Optional) Trivy Server
+#
+# For medium to large teams requiring centralized authentication.
+#####################################################
+
+services:
+  apiserver:
+    image: dependencytrack/apiserver
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    environment:
+      # Database Configuration
+      ALPINE_DATABASE_MODE: "external"
+      ALPINE_DATABASE_URL: "jdbc:postgresql://postgres:5432/dtrack"
+      ALPINE_DATABASE_DRIVER: "org.postgresql.Driver"
+      ALPINE_DATABASE_USERNAME: "dtrack"
+      ALPINE_DATABASE_PASSWORD: "changeme"  # IMPORTANT: Change this in production
+
+      # OIDC Configuration
+      ALPINE_OIDC_ENABLED: "true"
+      ALPINE_OIDC_ISSUER: "https://localhost:8443/realms/dtrack"  # IMPORTANT: Change to your Keycloak URL
+      ALPINE_OIDC_CLIENT_ID: "dependency-track"
+      ALPINE_OIDC_USERNAME_CLAIM: "preferred_username"
+      ALPINE_OIDC_TEAMS_CLAIM: "groups"
+      ALPINE_OIDC_USER_PROVISIONING: "true"
+      ALPINE_OIDC_TEAM_SYNCHRONIZATION: "true"
+
+      # Optional: Configure logging level
+      # LOGGING_LEVEL: "INFO"
+
+    deploy:
+      resources:
+        limits:
+          memory: 12288m
+        reservations:
+          memory: 8192m
+      restart_policy:
+        condition: on-failure
+    ports:
+      - "8081:8080"
+    volumes:
+      - "dtrack-data:/data"
+    restart: unless-stopped
+
+  frontend:
+    image: dependencytrack/frontend
+    depends_on:
+      apiserver:
+        condition: service_healthy
+    environment:
+      # The base URL of the API server
+      # IMPORTANT: Replace localhost with your server's IP or domain if accessed from other machines
+      API_BASE_URL: "http://localhost:8081"
+
+      # OIDC Configuration for Frontend
+      OIDC_ISSUER: "https://localhost:8443/realms/dtrack"  # IMPORTANT: Change to your Keycloak URL
+      OIDC_CLIENT_ID: "dependency-track"
+      OIDC_SCOPE: "openid profile email"
+      OIDC_FLOW: "implicit"
+
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: "dtrack"
+      POSTGRES_USER: "dtrack"
+      POSTGRES_PASSWORD: "changeme"  # IMPORTANT: Change this in production
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    volumes:
+      - "postgres-data:/var/lib/postgresql/data"
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: ["start-dev"]
+    environment:
+      # Admin Console Credentials
+      KC_BOOTSTRAP_ADMIN_USERNAME: "admin"
+      KC_BOOTSTRAP_ADMIN_PASSWORD: "changeme"  # IMPORTANT: Change this in production
+
+      # Database Configuration (embedded H2 for development)
+      # For production, use PostgreSQL:
+      # KC_DB: postgres
+      # KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      # KC_DB_USERNAME: keycloak
+      # KC_DB_PASSWORD: changeme
+
+      # Hostname Configuration
+      KC_HOSTNAME: "localhost"  # IMPORTANT: Change to your domain in production
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+
+      # HTTPS Configuration (optional for development)
+      # KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/conf/tls.crt
+      # KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/conf/tls.key
+
+    ports:
+      - "8443:8443"
+    volumes:
+      - "keycloak-data:/opt/keycloak/data"
+      # Optional: Mount TLS certificates
+      # - ./tls.crt:/opt/keycloak/conf/tls.crt:ro
+      # - ./tls.key:/opt/keycloak/conf/tls.key:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8443 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # Optional: Trivy Server for enhanced vulnerability scanning
+  # Uncomment this section if you want to enable Trivy integration in Dependency-Track
+  # trivy:
+  #   image: aquasec/trivy:latest
+  #   command:
+  #     - server
+  #     - --listen
+  #     - 0.0.0.0:8082
+  #     - --token
+  #     - changeme  # IMPORTANT: Change this token and configure it in Dependency-Track
+  #   volumes:
+  #     - trivy-cache:/root/.cache/trivy
+  #   ports:
+  #     - "8082:8082"
+  #   restart: unless-stopped
+
+volumes:
+  dtrack-data: {}
+  postgres-data: {}
+  keycloak-data: {}
+  # trivy-cache: {}  # Uncomment if using Trivy
