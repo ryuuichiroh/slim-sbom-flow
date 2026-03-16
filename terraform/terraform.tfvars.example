@@ -30,7 +30,7 @@ db_username                = "dtrack"
 db_instance_class          = "db.t4g.micro" # or db.t3.micro for x86
 db_multi_az                = false          # Set to true for production
 db_allocated_storage       = 20             # Initial storage in GB
-db_max_allocated_storage   = 1000           # Max auto-scaling storage in GB
+db_max_allocated_storage   = 40             # Max auto-scaling storage in GB
 db_backup_retention_period = 0              # 0 = no backups, 7-35 for production
 
 # Infrastructure Protection
@@ -38,7 +38,7 @@ enable_deletion_protection = false # Set to true for production
 enable_efs_backup          = false # Set to true for production (automatic EFS backups)
 
 # CloudWatch Logs
-log_retention_days = 30 # 7 for dev, 30-90 for production
+log_retention_days = 7 # 7 for dev, 30-90 for production
 
 # ECS Task Resources
 # API Server (Backend)
@@ -68,6 +68,6 @@ trivy_image                     = "public.ecr.aws/aquasecurity/trivy:latest"
 tags = {
   Project     = "ssf"
   ManagedBy   = "Terraform"
-  Environment = "production"
+  Environment = "dev"
   Owner       = "YOUR_TEAM_NAME"
 }

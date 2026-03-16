@@ -10,7 +10,7 @@ resource "random_password" "db_password" {
 # GitHub Actions カスタムヘッダー（ALB 認証用）
 resource "random_password" "gha_custom_header" {
   length  = 64
-  special = true
+  special = false # トークンなので記号不要
 }
 
 # OIDC Client Secret（Cognito から取得、後で設定）
@@ -30,7 +30,6 @@ resource "aws_secretsmanager_secret_version" "credentials" {
     DB_PASSWORD       = random_password.db_password.result
     GHA_CUSTOM_HEADER = random_password.gha_custom_header.result
     TRIVY_TOKEN       = random_password.trivy_token.result
-    GITHUB_API_KEY    = "" # 空文字列（後で手動更新可能）
   })
 
   lifecycle {
