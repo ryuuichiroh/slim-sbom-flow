@@ -1,0 +1,73 @@
+# Terraform variables template for SSF Dependency-Track deployment
+# Copy this file to terraform.tfvars and customize the values
+
+# Project Configuration
+project_name = "ssf"
+region       = "ap-northeast-1"
+aws_profile  = "ssf"
+
+# Application Domain (REQUIRED)
+app_domain = "dependency-track.example.com"
+
+# Network Configuration
+vpc_cidr             = "10.0.0.0/16"
+availability_zones   = ["ap-northeast-1a", "ap-northeast-1c"]
+public_subnet_cidrs  = ["10.0.0.0/20", "10.0.16.0/20"]
+private_subnet_cidrs = ["10.0.128.0/20", "10.0.144.0/20"]
+
+# Security Configuration
+office_ip_cidr = "YOUR_OFFICE_IP_CIDR" # e.g., "203.0.113.0/24"
+
+# ACM Certificate (REQUIRED)
+acm_certificate_arn = "YOUR_ACM_CERTIFICATE_ARN"
+
+# Cognito Configuration
+cognito_domain = "ssf-dt" # Must be unique across AWS region
+
+# Database Configuration
+db_name                    = "dtrack"
+db_username                = "dtrack"
+db_instance_class          = "db.t4g.micro" # or db.t3.micro for x86
+db_multi_az                = false          # Set to true for production
+db_allocated_storage       = 20             # Initial storage in GB
+db_max_allocated_storage   = 1000           # Max auto-scaling storage in GB
+db_backup_retention_period = 0              # 0 = no backups, 7-35 for production
+
+# Infrastructure Protection
+enable_deletion_protection = false # Set to true for production
+enable_efs_backup          = false # Set to true for production (automatic EFS backups)
+
+# CloudWatch Logs
+log_retention_days = 30 # 7 for dev, 30-90 for production
+
+# ECS Task Resources
+# API Server (Backend)
+ecs_api_task_cpu    = 2048 # 1024 = 1vCPU, 2048 = 2vCPU, 4096 = 4vCPU
+ecs_api_task_memory = 8192 # Memory in MB (must be compatible with CPU)
+
+# Frontend
+ecs_frontend_task_cpu    = 256 # 256 = 0.25vCPU
+ecs_frontend_task_memory = 512 # Memory in MB
+
+# ECS Service Scaling
+ecs_api_desired_count      = 1 # Set to 2+ for production (Multi-AZ redundancy)
+ecs_frontend_desired_count = 1 # Set to 2+ for production
+
+# Container Images - Option 1: Public registries (easier, but rate limits apply)
+dependency_track_api_image      = "dependencytrack/apiserver:4.11"
+dependency_track_frontend_image = "dependencytrack/frontend:4.11"
+trivy_image                     = "public.ecr.aws/aquasecurity/trivy:latest"
+
+# Container Images - Option 2: ECR Private (recommended for production)
+# First, copy images to your ECR. See README for instructions.
+# dependency_track_api_image      = "123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/dependency-track/apiserver:4.11"
+# dependency_track_frontend_image = "123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/dependency-track/frontend:4.11"
+# trivy_image                     = "123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/trivy:latest"
+
+# Resource Tags
+tags = {
+  Project     = "ssf"
+  ManagedBy   = "Terraform"
+  Environment = "production"
+  Owner       = "YOUR_TEAM_NAME"
+}
