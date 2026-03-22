@@ -47,7 +47,7 @@ variable "office_ip_cidr" {
 }
 
 variable "app_domain" {
-  description = "Application domain name (e.g. dependency-track.example.com)"
+  description = "Application domain name (e.g. ssf.example.com)"
   type        = string
 }
 
