@@ -1,8 +1,9 @@
-# Dependency-Track on AWS - Terraform Configuration
+# AWS へデプロイするための Terraform 設定
 
-このディレクトリには、AWS 上に Dependency-Track システムを構築するための Terraform 設定が含まれています。
+1. このディレクトリには、AWS 上に Dependency-Track システムを構築するための Terraform 設定が含まれています。
+2. 本ドキュメントでは、デプロイ方法をも示します。
 
-## 構成概要
+## ディレクトリ構成概要
 
 ```
 terraform/
@@ -18,21 +19,53 @@ terraform/
     └── compute/               # ECS Cluster, Task Definitions, Services
 ```
 
-## 前提条件
+## デプロイ前の準備
 
-1. **AWS CLI 設定**
-   ```bash
-   aws configure --profile ssf
-   ```
+1. AWS 利用環境のセットアップ
+   1. IAM アカウントの作成
+   2. AWS リソースを操作可能な アクセスキーの発行
+   2. AWS CLI のセットアップ
+      
+      以下のコマンドを実行し、発行したアクセスキーを設定します。
 
-2. **Terraform インストール**
+      ```bash
+      aws configure --profile ssf
+      ```
+
+2. Terraform インストール
+
+   公式の[インストール手順](https://developer.hashicorp.com/terraform/install)を参考に、
+   Terraform をインストールします。
+
+   念のため、正常にインストールできたか確認します。
    ```bash
+   # インストール確認
    terraform version  # >= 1.0
    ```
 
-3. **必要な AWS リソース（事前作成）**
-   - ACM 証明書（ALB 用）
-   - Route 53 ホストゾーン（独自ドメイン用）
+3. ドメインの取得
+
+4. AWS リソースを事前作成
+
+   - [ACM 証明書 (ALB 用)](#acm-証明書の作成)
+   - [Route 53 ホストゾーン (独自ドメイン用)](#route-53-ホストゾーンの作成)
+
+### ACM 証明書の作成
+
+1. AWS Certificate Manager → 証明書をリクエスト
+2. ドメイン名を設定
+
+   `example.com` の場合は、以下のように2つ設定:
+     - *.example.com
+     - example.com
+
+### Route 53 ホストゾーンの作成
+
+1. Route 53 → ホストゾーン → ホストゾーンの作成
+2. ドメイン名を設定してホストゾーンを作成
+3. AWS Certificate Manager → 証明書を一覧 → 証明書を選択
+4. Route 53 でレコードを作成
+    - レコードを作成できるようになるまで、少し時間がかかります
 
 ## デプロイ手順
 
@@ -98,10 +131,9 @@ terraform apply
 AWS Console から Cognito User Pool にアクセスして、ユーザーを作成：
 
 1. Cognito → User pools → ssf-user-pool を選択
-2. ユーザ管理 → グループ → 「グループを作成」をクリック
-3. グループを作成
-3. ユーザー管理 → ユーザー → 「ユーザーを作成」をクリック
-4. ユーザーを作成し、ユーザーをグループに追加
+2. ユーザ管理 → グループ → グループを作成
+3. ユーザー管理 → ユーザー → ユーザーを作成
+4. ユーザーをグループに追加
 
 ### 4. Dependency-Track の初期設定
 
@@ -147,3 +179,60 @@ terraform destroy
       --secret-id ssf/credentials \
       --force-delete-without-recovery
     ```
+
+## コスト削減
+
+### ECR Private へのイメージコピー
+
+`terraform/terraform.tfvars.example` の設定のまま運用すると、
+DT などの Docker イメージを AWS にデプロイする場合に以下の課題があります。
+
+- Docker イメージのデータ転送量が多くなり、運用コストが割高になる
+- Docker Hub の Rate Limit により、デプロイに失敗する可能性がある
+- 利用している Docker Image が、知らない間に更新される可能性がある
+
+そのため、Docker Image を ECR の Private レジストリにコピーして利用することを推奨します。
+ECR の Private レジストリを利用すると以下のメリットが得られます。
+- VPC Endpoint 経由でイメージプル可能（データ転送料ゼロ）
+- Docker Hub Rate Limit 回避
+- バージョン固定が容易（意図しない更新を防止）
+
+#### ECR の利用手順
+
+1. ECR のプライベートレジストリを作成
+   1. `Elastic Container Registry` → `Private registry` → `Repositories` をクリック
+   2. `リポジトリを作成` をクリック
+   3. `Repository name` を入力して `Create` をクリック
+
+      レジストリは、以下の `Repository name` で 3 つ作成します。
+      - `ssf/dt-apiserver`: DT の API サーバ
+      - `ssf/dt-frontend`: DT の Frontend
+      - `ssf/trivy`: Trivy Server
+
+2. ローカル環境で、以下のコマンドを実施
+
+   `<account-id>` を、あなたのアカウント ID に置き換えて実行してください。
+
+   ```bash
+   # AWS CLI ログイン
+   aws ecr get-login-password --region ap-northeast-1 | \
+     docker login --username AWS --password-stdin <account-id>.dkr.ecr.ap-northeast-1.amazonaws.com
+
+   # Dependency-Track API Server
+   docker pull dependencytrack/apiserver
+   docker tag dependencytrack/apiserver \
+     <account-id>.dkr.ecr.ap-northeast-1.amazonaws.com/ssf/dt-apiserver
+   docker push <account-id>.dkr.ecr.ap-northeast-1.amazonaws.com/ssf/dt-apiserver
+
+   # Dependency-Track Frontend
+   docker pull dependencytrack/frontend
+   docker tag dependencytrack/frontend \
+     <account-id>.dkr.ecr.ap-northeast-1.amazonaws.com/ssf/dt-frontend
+   docker push <account-id>.dkr.ecr.ap-northeast-1.amazonaws.com/ssf/dt-frontend
+
+   # Trivy (ECR Public から)
+   docker pull public.ecr.aws/aquasecurity/trivy
+   docker tag public.ecr.aws/aquasecurity/trivy \
+     <account-id>.dkr.ecr.ap-northeast-1.amazonaws.com/ssf/trivy
+   docker push <account-id>.dkr.ecr.ap-northeast-1.amazonaws.com/ssf/trivy
+   ```

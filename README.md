@@ -2,45 +2,17 @@
 
 低コストで構築・運用できる OSS 管理システム
 
-## 目次
-
-- [このリポジトリで提供するもの](#このリポジトリで提供するもの)
-- [目的](#目的)
-- [背景](#背景)
-- [ユースケース](#ユースケース)
-  - [1. 脆弱性管理の自動化](#1-脆弱性管理の自動化)
-  - [2. SBOM の生成・管理](#2-sbom-の生成管理)
-  - [3. 利用する OSS を管理する](#3-利用する-oss-を管理する)
-- [システム構成](#システム構成)
-  - [構成図](#構成図)
-  - [基本ツール](#基本ツール)
-  - [モジュール特性に合わせて選択するツール](#モジュール特性に合わせて選択するツール)
-  - [オプションツール](#オプションツール)
-- [ワークフロー](#ワークフロー)
-  - [PR 作成時のワークフロー](#pr-作成時のワークフロー)
-  - [Tag 作成時のワークフロー](#tag-作成時のワークフロー)
-- [運用監視](#運用監視)
-- [よくある質問と設計判断](FAQ.md)
-- [セットアップ方法](SETUP.md)
-
----
-
 ## このリポジトリで提供するもの
 
 他の組織がすぐに OSS 管理システムを構築できるように、以下を提供します。
 
-- **セットアップ手順書**: Dependency-Track、GitHub Actions の構築手順
-  - ✅ [docs/dependency-track-setup.md](docs/dependency-track-setup.md) - Dependency-Track 構築手順書
-  - ✅ [docs/oidc-setup-keycloak.md](docs/oidc-setup-keycloak.md) - OIDC 連携（Keycloak）セットアップガイド
-  - ✅ [SETUP.md](SETUP.md) - 全体のセットアップガイド
-- **Docker Compose**: Dependency-Track の構成テンプレート
-  - ✅ [docker-compose/basic/docker-compose.yml](docker-compose/basic/docker-compose.yml) - 基本構成（小規模チーム向け）
-  - ✅ [docker-compose/oidc/docker-compose.yml](docker-compose/oidc/docker-compose.yml) - OIDC 連携構成（中規模以上向け）
-- **GitHub Actions ワークフロー**: PR/Tag 作成時の自動チェック用（実装中）
-- **TypeScript スクリプト**: OSS 差分検出、Issue 自動生成（実装中）
-- **設定ファイルテンプレート**: 要レビュー OSS の定義、ポリシー設定（実装中）
-
-**※ 一部実装中です。完成次第、上記ファイルを順次追加します。**
+- [システムのセットアップ手順書](SETUP.md)
+- Dependency-Track を使った脆弱性管理環境の構築スクリプト
+  - [簡易的に DT 機能を確認するための docker-compose.yml](docker-compose/http/docker-compose.yml)
+  - [運用可能な DT を AWS にデプロイするための Terraform](docker-compose/oidc/docker-compose.yml)
+- SBOM 生成・管理のための GitHub Actions ワークフロー
+- GitHub Actions から利用される TypeScript スクリプト: OSS 差分検出、GitHub Issue 自動生成など
+- プロジェクトにあった OSS 管理をするためのカスタム設定ファイル: 要レビュー OSS の定義、ポリシー設定
 
 ## 目的
 
@@ -113,7 +85,7 @@ graph TB
   GHA -->|SBOM 登録| DT[Dependency-Track]
   GHA -->|チケット作成| ISSUE[GitHub Issues]
   DT --> PG[(PostgreSQL)]
-  DT -.-> KC[<<オプション>><br/>KeyCloak<br/>]
+  DT -.-> OIDC[<<オプション>><br/>OIDC 準拠の認証基盤<br/>]
   DT -->|脆弱性スキャン| VSCAN
   DT -->|脆弱性取得| VDB[脆弱性データベース群]
   DT -->|通知| NOTICE[通知（E-mail / Slack）]
@@ -144,7 +116,7 @@ graph TB
 
 | ツール | 用途 |
 |---|---|
-| **KeyCloak** | Dependency-Track のユーザ管理・認証（OIDC 連携の一例） |
+| **KeyCloak / AWS Cognito** | Dependency-Track のユーザ管理・認証（OIDC 連携の一例） |
 | **Xeol** | EOL の検知（EOL 検出精度に限界あり） |
 
 ## 認証と権限
@@ -152,7 +124,7 @@ graph TB
 以下の方針で、システムの利用者と権限を管理できます。
 
 - 小規模（単一チーム）では Dependency-Track の基本認証で開始できます
-- 中規模以上では OIDC 連携を推奨します（KeyCloak / Entra ID など）
+- 中規模以上では OIDC 連携を推奨します（KeyCloak / AWS Cognito など）
 - GitHub Actions が利用する Web API トークンと、UI ログインユーザの権限を分離できます
 - ユーザグループごとに閲覧・操作できるプロジェクトを制限できます
 
@@ -236,10 +208,3 @@ Dependency-Track を中心とした継続的な脆弱性監視を行います。
 Xeol と GitHub Actions を利用して、利用している OSS の EOL を定期的に確認します。
 - EOL を検出したら、Slack で通知します
 - Xeol は endoflife.date に依存するため、EOL の検出には限界があります
-
----
-
-## 関連ドキュメント
-
-- **[よくある質問と設計判断](FAQ.md)** - 設計時に検討した項目と判断結果
-- **[セットアップ方法](SETUP.md)** - システムの構築手順（実装予定）

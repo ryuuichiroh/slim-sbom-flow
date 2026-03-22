@@ -34,7 +34,12 @@ variable "efs_id" {
 }
 
 variable "efs_access_point_id" {
-  description = "EFS access point ID"
+  description = "EFS access point ID for Dependency-Track"
+  type        = string
+}
+
+variable "efs_access_point_trivy_id" {
+  description = "EFS access point ID for Trivy"
   type        = string
 }
 

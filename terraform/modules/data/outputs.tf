@@ -14,8 +14,13 @@ output "efs_id" {
 }
 
 output "efs_access_point_id" {
-  description = "EFS access point ID"
+  description = "EFS access point ID for Dependency-Track"
   value       = aws_efs_access_point.main.id
+}
+
+output "efs_access_point_trivy_id" {
+  description = "EFS access point ID for Trivy"
+  value       = aws_efs_access_point.trivy.id
 }
 
 output "gha_custom_header" {

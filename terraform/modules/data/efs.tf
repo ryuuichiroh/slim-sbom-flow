@@ -39,7 +39,30 @@ resource "aws_efs_access_point" "main" {
   }
 
   tags = {
-    Name    = "${var.project_name}-efs-ap"
+    Name    = "${var.project_name}-efs-ap-dtrack"
+    Project = var.project_name
+  }
+}
+
+resource "aws_efs_access_point" "trivy" {
+  file_system_id = aws_efs_file_system.main.id
+
+  posix_user {
+    gid = 1000
+    uid = 1000
+  }
+
+  root_directory {
+    path = "/trivy-cache"
+    creation_info {
+      owner_gid   = 1000
+      owner_uid   = 1000
+      permissions = "0755"
+    }
+  }
+
+  tags = {
+    Name    = "${var.project_name}-efs-ap-trivy"
     Project = var.project_name
   }
 }

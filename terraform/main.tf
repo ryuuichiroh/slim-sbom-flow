@@ -66,6 +66,7 @@ module "compute" {
   ecs_task_execution_role_arn     = module.security.ecs_task_execution_role_arn
   efs_id                          = module.data.efs_id
   efs_access_point_id             = module.data.efs_access_point_id
+  efs_access_point_trivy_id       = module.data.efs_access_point_trivy_id
   rds_address                     = module.data.rds_address
   db_name                         = var.db_name
   db_username                     = var.db_username

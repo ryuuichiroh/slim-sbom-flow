@@ -77,6 +77,21 @@ resource "aws_ecs_task_definition" "api" {
     }
   }
 
+  volume {
+    name = "${var.project_name}-trivy-cache"
+
+    efs_volume_configuration {
+      file_system_id     = var.efs_id
+      root_directory     = "/"
+      transit_encryption = "ENABLED"
+
+      authorization_config {
+        access_point_id = var.efs_access_point_trivy_id
+        iam             = "DISABLED"
+      }
+    }
+  }
+
   container_definitions = jsonencode([
     {
       name      = "${var.project_name}-apiserver"
@@ -154,7 +169,7 @@ resource "aws_ecs_task_definition" "api" {
       name      = "${var.project_name}-trivy"
       image     = var.trivy_image
       essential = false
-      command   = ["server", "--listen", "0.0.0.0:8082"]
+      command   = ["server", "--listen", "0.0.0.0:8082", "--cache-dir", "/cache"]
 
       portMappings = [
         {
@@ -170,6 +185,14 @@ resource "aws_ecs_task_definition" "api" {
         {
           name      = "TRIVY_TOKEN"
           valueFrom = "${var.secrets_manager_secret_arn}:TRIVY_TOKEN::"
+        }
+      ]
+
+      mountPoints = [
+        {
+          sourceVolume  = "${var.project_name}-trivy-cache"
+          containerPath = "/cache"
+          readOnly      = false
         }
       ]
 
