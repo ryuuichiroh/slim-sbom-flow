@@ -1,0 +1,25 @@
+version: "1.0"
+
+# パッケージ名による要レビュー判定
+packages:
+  # 例: セキュリティ懸念のあるパッケージ
+  # - name: "axios"
+  #   reason: "過去に脆弱性多数"
+
+  # 例: グループ指定（Maven/Gradleなど）
+  # - name: "spring-core"
+  #   group: "org.springframework"
+  #   reason: "ビジネスクリティカル"
+
+# ライセンスによる要レビュー判定
+licenses:
+  # 例: コピーレフトライセンス
+  - id: "GPL-3.0"
+    reason: "コピーレフトライセンス"
+
+  - id: "AGPL-3.0"
+    reason: "強いコピーレフトライセンス"
+
+  # 例: その他の注意が必要なライセンス
+  # - id: "SSPL-1.0"
+  #   reason: "サービス提供時に制約"

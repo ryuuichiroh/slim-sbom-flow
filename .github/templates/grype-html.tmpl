@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>脆弱性レポート - Grype</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #555;
+            margin-top: 30px;
+        }
+        .summary {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .summary-item {
+            text-align: center;
+            padding: 15px;
+            border-radius: 6px;
+        }
+        .critical { background-color: #dc3545; color: white; }
+        .high { background-color: #fd7e14; color: white; }
+        .medium { background-color: #ffc107; color: #333; }
+        .low { background-color: #28a745; color: white; }
+        .unknown { background-color: #6c757d; color: white; }
+        .count {
+            font-size: 2em;
+            font-weight: bold;
+            display: block;
+        }
+        .label {
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+            font-weight: 600;
+        }
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        .severity-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .no-vulnerabilities {
+            background: white;
+            padding: 40px;
+            text-align: center;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .no-vulnerabilities-icon {
+            font-size: 3em;
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔒 脆弱性スキャンレポート</h1>
+
+    <div class="summary">
+        <h2>サマリー</h2>
+        <div class="summary-grid">
+            <div class="summary-item critical">
+                <span class="count">{{$critical := 0}}{{range .Matches}}{{if eq .Vulnerability.Severity "Critical"}}{{$critical = add $critical 1}}{{end}}{{end}}{{$critical}}</span>
+                <span class="label">Critical</span>
+            </div>
+            <div class="summary-item high">
+                <span class="count">{{$high := 0}}{{range .Matches}}{{if eq .Vulnerability.Severity "High"}}{{$high = add $high 1}}{{end}}{{end}}{{$high}}</span>
+                <span class="label">High</span>
+            </div>
+            <div class="summary-item medium">
+                <span class="count">{{$medium := 0}}{{range .Matches}}{{if eq .Vulnerability.Severity "Medium"}}{{$medium = add $medium 1}}{{end}}{{end}}{{$medium}}</span>
+                <span class="label">Medium</span>
+            </div>
+            <div class="summary-item low">
+                <span class="count">{{$low := 0}}{{range .Matches}}{{if eq .Vulnerability.Severity "Low"}}{{$low = add $low 1}}{{end}}{{end}}{{$low}}</span>
+                <span class="label">Low</span>
+            </div>
+            <div class="summary-item unknown">
+                <span class="count">{{$unknown := 0}}{{range .Matches}}{{if or (eq .Vulnerability.Severity "Unknown") (eq .Vulnerability.Severity "")}}{{$unknown = add $unknown 1}}{{end}}{{end}}{{$unknown}}</span>
+                <span class="label">Unknown</span>
+            </div>
+        </div>
+    </div>
+
+    {{if .Matches}}
+    <h2>検出された脆弱性</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>パッケージ</th>
+                <th>バージョン</th>
+                <th>脆弱性ID</th>
+                <th>重要度</th>
+                <th>説明</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Matches}}
+            <tr>
+                <td>{{.Artifact.Name}}</td>
+                <td>{{.Artifact.Version}}</td>
+                <td><a href="https://nvd.nist.gov/vuln/detail/{{.Vulnerability.ID}}" target="_blank">{{.Vulnerability.ID}}</a></td>
+                <td><span class="severity-badge {{.Vulnerability.Severity | lower}}">{{.Vulnerability.Severity}}</span></td>
+                <td>{{.Vulnerability.Description}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+    {{else}}
+    <div class="no-vulnerabilities">
+        <div class="no-vulnerabilities-icon">✅</div>
+        <h2>脆弱性は検出されませんでした</h2>
+        <p>このスキャンでは既知の脆弱性は見つかりませんでした。</p>
+    </div>
+    {{end}}
+
+    <p style="text-align: center; color: #666; margin-top: 40px; font-size: 0.9em;">
+        Generated by <a href="https://github.com/anchore/grype">Grype</a> • slim-sbom-flow
+    </p>
+</body>
+</html>

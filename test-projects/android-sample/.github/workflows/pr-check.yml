@@ -1,0 +1,165 @@
+name: PR SBOM Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  sbom-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout slim-sbom-flow
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/slim-sbom-flow
+          ref: main
+          path: .ssf
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js for scripts
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: '.ssf/scripts/package-lock.json'
+
+      - name: Build scripts
+        run: |
+          cd .ssf/scripts
+          npm ci
+          npm run build
+
+      - name: Generate SBOM with Trivy
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          scan-type: 'fs'
+          skip-dirs: '.ssf'
+          scanners: 'vuln,license'
+          format: 'cyclonedx'
+          output: 'sbom-current.json'
+
+      - name: Verify SBOM
+        run: |
+          echo "SBOM generated: $(jq -r '.bomFormat + " " + .specVersion' sbom-current.json), $(jq '.components | length' sbom-current.json) components"
+
+      - name: Scan vulnerabilities with Trivy
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          scan-type: 'fs'
+          skip-dirs: '.ssf'
+          format: 'json'
+          output: 'vulnerability-result.json'
+        continue-on-error: true
+
+      - name: Verify vulnerability scan
+        run: |
+          if [ -f vulnerability-result.json ] && [ -s vulnerability-result.json ]; then
+            echo "✅ Vulnerability scan completed"
+            VULN_COUNT=$(jq '.Results[0].Vulnerabilities | length' vulnerability-result.json 2>/dev/null || echo "0")
+            echo "Found $VULN_COUNT vulnerabilities"
+          else
+            echo "⚠️ No vulnerability results"
+          fi
+
+      - name: Generate HTML vulnerability report
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          scan-type: 'fs'
+          skip-dirs: '.ssf'
+          format: 'template'
+          template: '@/home/runner/.local/bin/trivy-bin/contrib/html.tpl'
+          output: 'vulnerability-report.html'
+        continue-on-error: true
+
+      - name: Get baseline SBOM from Dependency-Track
+        id: get-baseline
+        run: |
+          CONFIG_FILE="config/ssf.yml"
+          if [ ! -f "$CONFIG_FILE" ]; then
+            echo "has_baseline=false" >> $GITHUB_OUTPUT
+            echo '{"bomFormat":"CycloneDX","specVersion":"1.4","version":1,"components":[]}' > previous-sbom.json
+            exit 0
+          fi
+
+          PRE_VERSION=$(node .ssf/scripts/dist/config-reader.js "$CONFIG_FILE" "pre_version")
+
+          if [ -z "$PRE_VERSION" ]; then
+            echo "has_baseline=false" >> $GITHUB_OUTPUT
+            echo '{"bomFormat":"CycloneDX","specVersion":"1.4","version":1,"components":[]}' > previous-sbom.json
+            exit 0
+          fi
+
+          if [ -z "${{ secrets.DT_API_KEY }}" ] || [ -z "${{ vars.DT_BASE_URL }}" ]; then
+            echo "Error: pre_version is set but DT_API_KEY or DT_BASE_URL is missing"
+            exit 1
+          fi
+
+          PROJECT_NAME=$(node .ssf/scripts/dist/config-reader.js "$CONFIG_FILE" "project_name")
+
+          if [ -z "$PROJECT_NAME" ]; then
+            PROJECT_NAME="${{ github.event.repository.name }}"
+          fi
+
+          if [ -z "$PROJECT_NAME" ]; then
+            echo "Error: project_name not found"
+            exit 1
+          fi
+
+          echo "has_baseline=true" >> $GITHUB_OUTPUT
+          echo "baseline_version=$PRE_VERSION" >> $GITHUB_OUTPUT
+          echo "project_name=$PROJECT_NAME" >> $GITHUB_OUTPUT
+
+          node .ssf/scripts/dist/dt-client.js "$PROJECT_NAME" "$PRE_VERSION" previous-sbom.json
+        env:
+          DT_BASE_URL: ${{ vars.DT_BASE_URL }}
+          DT_API_KEY: ${{ secrets.DT_API_KEY }}
+          SSF_SECRET_TOKEN: ${{ secrets.SSF_SECRET_TOKEN }}
+        continue-on-error: false
+
+      - name: Compare SBOMs
+        run: |
+          BASELINE_VERSION="${{ steps.get-baseline.outputs.baseline_version }}"
+          node .ssf/scripts/dist/diff-checker.js sbom-current.json previous-sbom.json diff-result.json "$BASELINE_VERSION"
+
+      - name: Post PR comment
+        run: |
+          ARTIFACT_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          REVIEW_RULES_PATH="config/review-required-oss.yml"
+          if [ ! -f "$REVIEW_RULES_PATH" ]; then
+            REVIEW_RULES_PATH=".ssf/config/review-required-oss.yml.template"
+          fi
+
+          VULN_PATH="vulnerability-result.json"
+          if [ ! -f "$VULN_PATH" ] || [ ! -s "$VULN_PATH" ]; then
+            VULN_PATH="null"
+          fi
+
+          node .ssf/scripts/dist/pr-commenter.js \
+            ${{ github.event.pull_request.number }} \
+            diff-result.json \
+            "$VULN_PATH" \
+            "$REVIEW_RULES_PATH" \
+            "$ARTIFACT_URL"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-pr-${{ github.event.pull_request.number }}
+          path: |
+            sbom-current.json
+            diff-result.json
+            vulnerability-result.json
+            vulnerability-report.html
+          retention-days: 90

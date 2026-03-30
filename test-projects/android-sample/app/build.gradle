@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.example.androidsample'
+    compileSdk 33
+
+    defaultConfig {
+        applicationId "com.example.androidsample"
+        minSdk 26
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    packagingOptions {
+        resources {
+            excludes += '/META-INF/DEPENDENCIES'
+        }
+    }
+}
+
+dependencies {
+    // 脆弱性のある古いバージョンを意図的に使用（テスト用）
+    implementation 'com.squareup.okhttp3:okhttp:3.12.0'  // 複数の脆弱性
+    implementation 'com.google.code.gson:gson:2.8.5'      // DoS 脆弱性
+    implementation 'org.apache.logging.log4j:log4j-core:2.14.1'  // Log4Shell (CVE-2021-44228) Critical!
+}

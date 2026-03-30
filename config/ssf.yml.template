@@ -1,0 +1,10 @@
+# slim-sbom-flow プロジェクト設定
+
+# Dependency-Track のプロジェクト名
+# 未指定の場合、生成した SBOM の metadata.component.name を使用します
+# project_name: "my-app"
+
+# 比較対象の Dependency-Track プロジェクトバージョン
+# 未指定の場合は差分比較をスキップ（全て新規扱い）
+# 新バージョンをリリースして DT に登録した後、この値を更新してください
+# pre_version: "1.0.0"

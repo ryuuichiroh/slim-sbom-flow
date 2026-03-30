@@ -1,0 +1,15 @@
+{
+  "name": "npm-sample",
+  "version": "1.0.0",
+  "description": "Test project for Syft + Grype workflow",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "4.17.1",
+    "lodash": "4.17.20",
+    "axios": "0.21.1"
+  },
+  "license": "MIT"
+}
