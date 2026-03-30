@@ -321,11 +321,6 @@ Trivy の HTML テンプレート機能を使用します。
 - name: Build with Bear
   run: bear -- make
   # compile_commands.json が生成される
-
-- name: Extract link information
-  run: |
-    # compile_commands.json からリンクされるライブラリを抽出
-    node scripts/extract-link-info.js compile_commands.json > link-info.json
 ```
 
 #### ScanCode によるスキャン
@@ -356,7 +351,7 @@ Bear のリンク情報、ScanCode の結果、およびベースライン SBOM�
   env:
     COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
   run: |
-    copilot -p "link-info.json, scancode-result.json, previous-sbom.json を読み込み、
+    copilot -p "compile_commands.json, scancode-result.json, previous-sbom.json を読み込み、
     .github/skills/generate-sbom.md の指示に従って CycloneDX SBOM を sbom-current.json に生成してください" \
     --allow-tool=read --allow-tool=write --no-ask-user
 ```
@@ -387,7 +382,6 @@ ScanCode はプロジェクト規模によって実行時間が大きく変わ�
 | `review-checker.ts` | 要レビュー OSS 判定 | diff-result, review-required-oss.yml | 判定結果 |
 | `pr-commenter.ts` | PR コメント生成・投稿 | diff-result, vulnerability-result, 判定結果 | PR コメント |
 | `vuln-summary.ts` | 脆弱性サマリ集計 | vulnerability-result.json | レベル別件数 |
-| `extract-link-info.ts` | Bear 結果からリンク情報抽出 | compile_commands.json | link-info.json |
 
 ScanCode ワークフローの SBOM 生成は Copilot CLI + Agent Skills (`.github/skills/generate-sbom.md`) で実行するため、専用の TypeScript スクリプトは不要です。
 
@@ -586,7 +580,6 @@ slim-sbom-flow/
       review-checker.ts
       pr-commenter.ts
       vuln-summary.ts
-      extract-link-info.ts
     package.json
     tsconfig.json
   test-projects/
