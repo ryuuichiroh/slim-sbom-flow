@@ -22,7 +22,7 @@ function isLicenseReviewRequired(component: Component, rules: LicenseRule[]): { 
   }
 
   for (const license of component.licenses) {
-    const licenseId = license.id || license.name;
+    const licenseId = license.license?.id || license.license?.name || license.expression;
     if (!licenseId) continue;
 
     for (const rule of rules) {
